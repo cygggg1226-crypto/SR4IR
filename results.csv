@@ -1,0 +1,7 @@
+run,date,git_commit,task,scale,setting,epochs,seed,map_50,map_5095,ap_small,psnr,lpips,source_log,notes
+024_SR4IR_edsr_x8,2026-07-03,a510a78,det,8,SR4IR,30,100,0.470,0.255,0.008,20.855,0.416,experiments/det/024_SR4IR_edsr_x8/test_log.txt,P0 official pretrained; README target mAP 25.5 LPIPS 0.416
+000_H2T,2026-07-03,a510a78,det,4,H2T,30,100,0.640,0.367,0.035,,,experiments/det/000_H2T/test_log.txt,P0 official; README mAP 36.7
+002_L2T_x8,2026-07-03,a510a78,det,8,L2T,30,100,0.386,0.189,0.004,20.291,0.559,experiments/det/002_L2T_x8/test_log.txt,P0 official; README mAP 18.9 LPIPS 0.559
+021_S2T_edsr_x8,2026-07-03,a510a78,det,8,S2T,30,100,0.425,0.219,0.003,21.618,0.494,experiments/det/021_S2T_edsr_x8/test_log.txt,P0 official
+022_T2S_edsr_x8,2026-07-03,a510a78,det,8,T2S,30,100,0.322,0.155,0.001,20.482,0.476,experiments/det/022_T2S_edsr_x8/test_log.txt,P0 official
+023_SwT_edsr_x8,2026-07-03,a510a78,det,8,S+T,30,100,0.404,0.203,0.009,20.982,0.506,experiments/det/023_SwT_edsr_x8/test_log.txt,P0 official
