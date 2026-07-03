@@ -11,3 +11,9 @@ __pycache__/
 # files for experiments
 scripts
 rm_archives.sh
+datasets/
+experiments/
+*.pth
+*.tar
+__pycache__/
+results/tb_logger/
