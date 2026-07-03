@@ -6,3 +6,4 @@ run,date,git_commit,task,scale,setting,epochs,seed,map_50,map_5095,ap_small,psnr
 022_T2S_edsr_x8,2026-07-03,a510a78,det,8,T2S,30,100,0.322,0.155,0.001,20.482,0.476,experiments/det/022_T2S_edsr_x8/test_log.txt,P0 official
 023_SwT_edsr_x8,2026-07-03,a510a78,det,8,S+T,30,100,0.404,0.203,0.009,20.982,0.506,experiments/det/023_SwT_edsr_x8/test_log.txt,P0 official
 det_voc_x4_h2t_e10_s42,2026-07-03,09e10bd,det,4,H2T,10,42,0.659,0.379,0.037,,,experiments/det/det_voc_x4_h2t_e10_s42/test_log.txt,P1 run1 upper bound
+det_voc_x4_l2t_e10_s42,2026-07-03,fe98e0d,det,4,L2T,10,42,0.533,0.285,0.013,22.767,0.411,experiments/det/det_voc_x4_l2t_e10_s42/test_log.txt,P1 run2 lower bound
