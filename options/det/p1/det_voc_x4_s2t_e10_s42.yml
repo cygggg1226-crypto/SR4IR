@@ -1,0 +1,72 @@
+# P1 run3: S->T (frozen SR, train det on SR output). Derived from options/det/011_S2T_edsr_x4.yml
+# changes: batch 16->2 (+grad_accum 4), amp on, epoch 30->10, seed 100->42, num_threads 16->4
+# DEVIATION: SR weights = DIV2K-pretrained EDSR x4 (official 010_SR trains EDSR on VOC first)
+name: det_voc_x4_s2t_e10_s42
+model_type: sr_det
+num_threads: 4
+print_freq: 100  # unit: iter
+manual_seed: 42
+scale: 4
+deterministic: true
+
+# data and augmentation
+data:
+  path: datasets/VOC_COCO
+  format: coco
+  aspect_ratio_group_factor : 3
+  data_augmentation: hflip
+  is_voc: true
+
+# network specs
+network_sr:
+  name: edsr
+  n_blocks: 16
+  n_feats: 64
+network_det:
+  name: fasterrcnn_mobilenet_v3_large_fpn
+  weights_backbone: MobileNet_V3_Large_Weights.IMAGENET1K_V1
+  num_classes: 21
+
+# path for pretrained model
+path:
+  network_sr: experiments/pretrained_models/edsr_baseline_x4-6b446fab.pt
+  network_det: ~
+
+# training config
+train:
+  batch_size: 2
+  grad_accum: 4  # effective batch 8
+  amp: true
+  epoch: 10
+  save_freq: 5  # unit: epoch
+  eval_freq: 5
+
+  sr_is_trainable: false
+  det_is_trainable: true
+
+  # optimizer
+  optim_det:
+    type: SGD
+    lr: !!float 2e-2
+    momentum: 0.9
+    weight_decay: !!float 1e-4
+
+  # scheduler
+  scheduler_det:
+    type: CosineAnnealingRestartLR
+    periods: [10]
+    restart_weights: [1]
+    eta_min: !!float 1e-4
+
+  # losses
+  det_opt:
+    type: DETLoss
+    loss_weight: !!float 1.0
+
+# testing config
+test:
+  batch_size: 1
+  visualize_first_n: 10
+
+# DDP setting
+dist_url: env:://

@@ -87,21 +87,22 @@ class HRDetectionModel(BaseModel):
             target_list = [{k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in t.items()} for t in target_list]
             
             # object detection
-            _, loss_dict_hr = self.net_det(img_hr_list, target_list)
-            
-            # loss calculation and backwarding
-            self.optimizer_det.zero_grad()
-            
-            l_total = 0
-            current_iter = iter + len(data_loader_train)*(epoch-1)
-            if hasattr(self, 'cri_det'):
-                l_det = self.cri_det(loss_dict_hr)
-                metric_logger.meters["l_det"].update(l_det.item())
-                self.tb_logger.add_scalar('losses/l_det', l_det.item(), current_iter)
-                l_total += l_det
-                
-            l_total.backward()
-            self.optimizer_det.step()
+            with torch.amp.autocast('cuda', enabled=self.amp):
+                _, loss_dict_hr = self.net_det(img_hr_list, target_list)
+
+                l_total = 0
+                current_iter = iter + len(data_loader_train)*(epoch-1)
+                if hasattr(self, 'cri_det'):
+                    l_det = self.cri_det(loss_dict_hr)
+                    metric_logger.meters["l_det"].update(l_det.item())
+                    self.tb_logger.add_scalar('losses/l_det', l_det.item(), current_iter)
+                    l_total += l_det
+
+            self.scaler.scale(l_total / self.grad_accum).backward()
+            if self.is_accum_boundary(iter, len(data_loader_train)):
+                self.scaler.step(self.optimizer_det)
+                self.scaler.update()
+                self.optimizer_det.zero_grad()
             
             # logging training state
             metric_logger.update(lr_det=round(self.optimizer_det.param_groups[0]["lr"], 8))
@@ -137,7 +138,7 @@ class HRDetectionModel(BaseModel):
             outputs_hr = [{k: v.to(torch.device("cpu")) for k, v in t.items()} for t in outputs_hr]
             
             # visualizing tool
-            if self.opt['test'].get('visualize', False): # and num_processed_samples < 20:
+            if self.opt['test'].get('visualize', False) and num_processed_samples < self.opt['test'].get('visualize_first_n', 10):
                 self.visualize(img_hr_list[0], target_list[0], filename.replace('.jpg', '_gt.jpg'))
                 self.visualize(img_hr_list[0], outputs_hr[0], filename)
 

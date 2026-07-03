@@ -57,6 +57,14 @@ class BaseModel():
             
         # transform functions
         self.normalize = ManualNormalize()
+
+        # AMP and gradient accumulation (train.amp / train.grad_accum, default off)
+        train_opt = opt.get('train', False) or {}
+        self.amp = bool(train_opt.get('amp', False))
+        self.grad_accum = max(1, int(train_opt.get('grad_accum', 1)))
+        self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp)
+        if self.is_train and (self.amp or self.grad_accum > 1):
+            self.text_logger.write(f'NOTICE: AMP: {self.amp}, grad_accum: {self.grad_accum}')
         
         # for lpips calculation
         if opt['test'].get('calculate_lpips', False):
@@ -65,6 +73,10 @@ class BaseModel():
     def save(self, epoch, current_iter):
         """Save networks and training state."""
         pass
+
+    def is_accum_boundary(self, iter, data_loader_len):
+        """Whether optimizers should step at this iteration (gradient accumulation)."""
+        return ((iter + 1) % self.grad_accum == 0) or ((iter + 1) == data_loader_len)
 
     def model_to_device(self, net, is_trainable=True):
         """Model to device. It also warps models with DistributedDataParallel

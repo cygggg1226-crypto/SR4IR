@@ -96,21 +96,22 @@ class LRDetectionModel(BaseModel):
             img_lr_list = self.batch_to_list(img_lr_batch, img_list=img_hr_list)
             
             # object detection
-            _, loss_dict_lr = self.net_det(img_lr_list, target_list)
-            
-            # loss calculation and backwarding
-            self.optimizer_det.zero_grad()
-            
-            l_total = 0
-            current_iter = iter + len(data_loader_train)*(epoch-1)
-            if hasattr(self, 'cri_det'):
-                l_det = self.cri_det(loss_dict_lr)
-                metric_logger.meters["l_det"].update(l_det.item())
-                self.tb_logger.add_scalar('losses/l_det', l_det.item(), current_iter)
-                l_total += l_det
-                
-            l_total.backward()
-            self.optimizer_det.step()
+            with torch.amp.autocast('cuda', enabled=self.amp):
+                _, loss_dict_lr = self.net_det(img_lr_list, target_list)
+
+                l_total = 0
+                current_iter = iter + len(data_loader_train)*(epoch-1)
+                if hasattr(self, 'cri_det'):
+                    l_det = self.cri_det(loss_dict_lr)
+                    metric_logger.meters["l_det"].update(l_det.item())
+                    self.tb_logger.add_scalar('losses/l_det', l_det.item(), current_iter)
+                    l_total += l_det
+
+            self.scaler.scale(l_total / self.grad_accum).backward()
+            if self.is_accum_boundary(iter, len(data_loader_train)):
+                self.scaler.step(self.optimizer_det)
+                self.scaler.update()
+                self.optimizer_det.zero_grad()
             
             # logging training state
             metric_logger.update(lr_det=round(self.optimizer_det.param_groups[0]["lr"], 8))
@@ -151,7 +152,7 @@ class LRDetectionModel(BaseModel):
             outputs_lr = [{k: v.to(torch.device("cpu")) for k, v in t.items()} for t in outputs_lr]
             
             # visualizing tool
-            if self.opt['test'].get('visualize', False): # and num_processed_samples < 20:
+            if self.opt['test'].get('visualize', False) and num_processed_samples < self.opt['test'].get('visualize_first_n', 10):
                 self.visualize(img_lr_list[0], outputs_lr[0], filename)
 
             # evaluation on validation batch

@@ -133,36 +133,38 @@ class SRDetectionModel(BaseModel):
             img_hr_batch = self.list_to_batch(img_hr_list)
             img_lr_batch = quantize(interpolate(img_hr_batch, scale_factor=(1/self.scale), mode='bicubic'))
             
-            # super resolution
-            img_sr_batch = self.net_sr(img_lr_batch)
-            img_sr_list = self.batch_to_list(img_sr_batch, img_list=img_hr_list)
-                        
-            # loss calculation and backwarding
-            if self.sr_is_trainable:
-                self.optimizer_sr.zero_grad()
-            if self.det_is_trainable:
-                self.optimizer_det.zero_grad()
-            
-            l_total = 0
-            current_iter = iter + len(data_loader_train)*(epoch-1)
-            if hasattr(self, 'cri_pix'):
-                l_pix = self.cri_pix(img_sr_batch, img_hr_batch)
-                metric_logger.meters["l_pix"].update(l_pix.item()) 
-                self.tb_logger.add_scalar('losses/l_pix', l_pix.item(), current_iter)
-                l_total += l_pix
-            if hasattr(self, 'cri_det'):
-                # object detection
-                _, loss_dict_sr = self.net_det(img_sr_list, target_list)
-                l_det = self.cri_det(loss_dict_sr)
-                metric_logger.meters["l_det"].update(l_det.item())
-                self.tb_logger.add_scalar('losses/l_det', l_det.item(), current_iter)
-                l_total += l_det
-            
-            l_total.backward()
-            if self.sr_is_trainable:
-                self.optimizer_sr.step()
-            if self.det_is_trainable:
-                self.optimizer_det.step()
+            with torch.amp.autocast('cuda', enabled=self.amp):
+                # super resolution
+                img_sr_batch = self.net_sr(img_lr_batch)
+                img_sr_list = self.batch_to_list(img_sr_batch, img_list=img_hr_list)
+
+                l_total = 0
+                current_iter = iter + len(data_loader_train)*(epoch-1)
+                if hasattr(self, 'cri_pix'):
+                    l_pix = self.cri_pix(img_sr_batch, img_hr_batch)
+                    metric_logger.meters["l_pix"].update(l_pix.item())
+                    self.tb_logger.add_scalar('losses/l_pix', l_pix.item(), current_iter)
+                    l_total += l_pix
+                if hasattr(self, 'cri_det'):
+                    # object detection
+                    _, loss_dict_sr = self.net_det(img_sr_list, target_list)
+                    l_det = self.cri_det(loss_dict_sr)
+                    metric_logger.meters["l_det"].update(l_det.item())
+                    self.tb_logger.add_scalar('losses/l_det', l_det.item(), current_iter)
+                    l_total += l_det
+
+            self.scaler.scale(l_total / self.grad_accum).backward()
+            if self.is_accum_boundary(iter, len(data_loader_train)):
+                if self.sr_is_trainable:
+                    self.scaler.step(self.optimizer_sr)
+                if self.det_is_trainable:
+                    self.scaler.step(self.optimizer_det)
+                self.scaler.update()
+                if self.sr_is_trainable:
+                    self.optimizer_sr.zero_grad()
+                if self.det_is_trainable:
+                    self.optimizer_det.zero_grad()
+            img_sr_batch = img_sr_batch.float()
             
             # logging training state
             psnr, valid_batch_size = calculate_psnr_batch(quantize(img_sr_batch), img_hr_batch)
@@ -214,7 +216,7 @@ class SRDetectionModel(BaseModel):
             outputs_sr = [{k: v.to(torch.device("cpu")) for k, v in t.items()} for t in outputs_sr]
 
             # visualizing tool
-            if self.opt['test'].get('visualize', False): # and num_processed_samples < 20:
+            if self.opt['test'].get('visualize', False) and num_processed_samples < self.opt['test'].get('visualize_first_n', 10):
                 self.visualize(img_sr_list[0], outputs_sr[0], filename)
 
             # evaluation on validation batch

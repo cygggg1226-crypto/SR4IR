@@ -134,61 +134,67 @@ class SR4IRDetectionModel(BaseModel):
             
             # phase 1;
             # update net_sr, freeze net_cls
-            img_sr_batch = self.net_sr(img_lr_batch)
-            img_sr_list = self.batch_to_list(img_sr_batch, img_list=img_hr_list)
             for p in self.net_det.parameters(): p.requires_grad = False
-            self.optimizer_sr.zero_grad()
-            l_total_sr = 0
-            if hasattr(self, 'cri_pix'):
-                l_pix = self.cri_pix(img_sr_batch, img_hr_batch)
-                metric_logger.meters["l_pix"].update(l_pix.item()) 
-                self.tb_logger.add_scalar('losses/l_pix', l_pix.item(), current_iter)
-                l_total_sr += l_pix
-            if epoch > self.warmup_epoch:
-                if hasattr(self, 'cri_tdp'):
-                    self.net_det.eval()
-                    _, _, feat_sr = self.net_det(img_sr_list, return_feats=True)
-                    _, _, feat_hr = self.net_det(img_hr_list, return_feats=True)
-                    self.net_det.train()
-                    
-                    l_tdp = self.cri_tdp(feat_sr['features'], feat_hr['features'])
-                    metric_logger.meters["l_tdp"].update(l_tdp.item()) 
-                    self.tb_logger.add_scalar('losses/l_tdp', l_tdp.item(), current_iter)
-                    l_total_sr += l_tdp
-            l_total_sr.backward()
-            self.optimizer_sr.step()
-            
+            with torch.amp.autocast('cuda', enabled=self.amp):
+                img_sr_batch = self.net_sr(img_lr_batch)
+                img_sr_list = self.batch_to_list(img_sr_batch, img_list=img_hr_list)
+                l_total_sr = 0
+                if hasattr(self, 'cri_pix'):
+                    l_pix = self.cri_pix(img_sr_batch, img_hr_batch)
+                    metric_logger.meters["l_pix"].update(l_pix.item())
+                    self.tb_logger.add_scalar('losses/l_pix', l_pix.item(), current_iter)
+                    l_total_sr += l_pix
+                if epoch > self.warmup_epoch:
+                    if hasattr(self, 'cri_tdp'):
+                        self.net_det.eval()
+                        _, _, feat_sr = self.net_det(img_sr_list, return_feats=True)
+                        _, _, feat_hr = self.net_det(img_hr_list, return_feats=True)
+                        self.net_det.train()
+
+                        l_tdp = self.cri_tdp(feat_sr['features'], feat_hr['features'])
+                        metric_logger.meters["l_tdp"].update(l_tdp.item())
+                        self.tb_logger.add_scalar('losses/l_tdp', l_tdp.item(), current_iter)
+                        l_total_sr += l_tdp
+            self.scaler.scale(l_total_sr / self.grad_accum).backward()
+
             # phase 2;
             # update network det, freeze net_cls
-            img_sr_batch = self.net_sr(img_lr_batch).detach()
-            img_sr_list = self.batch_to_list(img_sr_batch, img_list=img_hr_list)
             for p in self.net_det.parameters(): p.requires_grad = True
-            self.optimizer_det.zero_grad()
-            l_total_det = 0
-            if hasattr(self, 'cri_det_sr'):
-                _, loss_dict_sr = self.net_det(img_sr_list, target_list)
-                l_det_sr = self.cri_det_sr(loss_dict_sr)
-                metric_logger.meters["l_det_sr"].update(l_det_sr.item())
-                self.tb_logger.add_scalar('losses/l_det_sr', l_det_sr.item(), current_iter)
-                l_total_det += l_det_sr
-            if hasattr(self, 'cri_det_hr'):
-                _, loss_dict_hr = self.net_det(img_hr_list, target_list)
-                l_det_hr = self.cri_det_hr(loss_dict_hr)
-                metric_logger.meters["l_det_hr"].update(l_det_hr.item())
-                self.tb_logger.add_scalar('losses/l_det_hr', l_det_hr.item(), current_iter)
-                l_total_det += l_det_hr
-            if hasattr(self, 'cri_det_cqmix'):
-                batch_size = len(img_hr_list)
-                mask = interpolate((torch.randn(batch_size,1,8,8)).bernoulli_(p=0.5), size=(img_hr_batch.shape[2:]), mode='nearest').to(self.device)
-                img_cqmix_batch = img_sr_batch*mask + img_hr_batch*(1-mask)
-                img_cqmix_list = self.batch_to_list(img_cqmix_batch, img_list=img_hr_list)
-                _, loss_dict_cqmix = self.net_det(img_cqmix_list, target_list)
-                l_det_cqmix = self.cri_det_hr(loss_dict_cqmix)
-                metric_logger.meters["l_det_cqmix"].update(l_det_cqmix.item())
-                self.tb_logger.add_scalar('losses/l_det_cqmix', l_det_cqmix.item(), current_iter)
-                l_total_det += l_det_cqmix
-            l_total_det.backward()
-            self.optimizer_det.step()
+            with torch.amp.autocast('cuda', enabled=self.amp):
+                img_sr_batch = self.net_sr(img_lr_batch).detach()
+                img_sr_list = self.batch_to_list(img_sr_batch, img_list=img_hr_list)
+                l_total_det = 0
+                if hasattr(self, 'cri_det_sr'):
+                    _, loss_dict_sr = self.net_det(img_sr_list, target_list)
+                    l_det_sr = self.cri_det_sr(loss_dict_sr)
+                    metric_logger.meters["l_det_sr"].update(l_det_sr.item())
+                    self.tb_logger.add_scalar('losses/l_det_sr', l_det_sr.item(), current_iter)
+                    l_total_det += l_det_sr
+                if hasattr(self, 'cri_det_hr'):
+                    _, loss_dict_hr = self.net_det(img_hr_list, target_list)
+                    l_det_hr = self.cri_det_hr(loss_dict_hr)
+                    metric_logger.meters["l_det_hr"].update(l_det_hr.item())
+                    self.tb_logger.add_scalar('losses/l_det_hr', l_det_hr.item(), current_iter)
+                    l_total_det += l_det_hr
+                if hasattr(self, 'cri_det_cqmix'):
+                    batch_size = len(img_hr_list)
+                    mask = interpolate((torch.randn(batch_size,1,8,8)).bernoulli_(p=0.5), size=(img_hr_batch.shape[2:]), mode='nearest').to(self.device)
+                    img_cqmix_batch = img_sr_batch*mask + img_hr_batch*(1-mask)
+                    img_cqmix_list = self.batch_to_list(img_cqmix_batch, img_list=img_hr_list)
+                    _, loss_dict_cqmix = self.net_det(img_cqmix_list, target_list)
+                    l_det_cqmix = self.cri_det_hr(loss_dict_cqmix)
+                    metric_logger.meters["l_det_cqmix"].update(l_det_cqmix.item())
+                    self.tb_logger.add_scalar('losses/l_det_cqmix', l_det_cqmix.item(), current_iter)
+                    l_total_det += l_det_cqmix
+            self.scaler.scale(l_total_det / self.grad_accum).backward()
+
+            if self.is_accum_boundary(iter, len(data_loader_train)):
+                self.scaler.step(self.optimizer_sr)
+                self.scaler.step(self.optimizer_det)
+                self.scaler.update()
+                self.optimizer_sr.zero_grad()
+                self.optimizer_det.zero_grad()
+            img_sr_batch = img_sr_batch.float()
             
             # psnr, lr
             psnr, valid_batch_size = calculate_psnr_batch(quantize(img_sr_batch), img_hr_batch)
@@ -236,7 +242,7 @@ class SR4IRDetectionModel(BaseModel):
             outputs_sr = [{k: v.to(torch.device("cpu")) for k, v in t.items()} for t in outputs_sr]
 
             # visualizing tool
-            if self.opt['test'].get('visualize', False): # and (num_processed_samples < 20):
+            if self.opt['test'].get('visualize', False) and num_processed_samples < self.opt['test'].get('visualize_first_n', 10):
                 self.visualize(img_sr_list[0], outputs_sr[0], filename)
 
             # evaluation on validation batch
