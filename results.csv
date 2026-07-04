@@ -9,3 +9,4 @@ det_voc_x4_h2t_e10_s42,2026-07-03,09e10bd,det,4,H2T,10,42,0.659,0.379,0.037,,,ex
 det_voc_x4_l2t_e10_s42,2026-07-03,fe98e0d,det,4,L2T,10,42,0.533,0.285,0.013,22.767,0.411,experiments/det/det_voc_x4_l2t_e10_s42/test_log.txt,P1 run2 lower bound
 det_voc_x4_s2t_e10_s42,2026-07-03,2ee9709,det,4,S2T,10,42,0.538,0.290,0.022,20.135,0.424,experiments/det/det_voc_x4_s2t_e10_s42/test_log.txt,P1 run3; SR=DIV2K pretrained frozen (deviation: official trains 010_SR on VOC first)
 det_voc_x4_swt_e10_s42,2026-07-03,87a3c89,det,4,S+T,10,42,0.557,0.302,0.021,23.778,0.355,experiments/det/det_voc_x4_swt_e10_s42/test_log.txt,P1 run4 naive joint S+T
+det_voc_x4_sr4ir_e10_s42,2026-07-03,7559d8b,det,4,SR4IR,10,42,0.583,0.329,0.023,24.003,0.280,experiments/det/det_voc_x4_sr4ir_e10_s42/test_log.txt,P1 run5 full SR4IR: TDP+CQMix+alternate
