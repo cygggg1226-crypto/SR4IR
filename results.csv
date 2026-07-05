@@ -15,3 +15,4 @@ det_voc_x4_sr4ir_nocqmix_e10_s42,2026-07-04,2e30664,det,4,SR4IR,10,42,0.589,0.33
 det_voc_x4_sr4ir_noalt_e10_s42,2026-07-04,a719fe2,det,4,SR4IR,10,42,0.516,0.284,0.016,23.991,0.315,experiments/det/det_voc_x4_sr4ir_noalt_e10_s42/test_log.txt,P2 run8 ablation: no alternate training (sync joint update)
 det_voc_x8_l2t_e10_s42,2026-07-04,35d48e9,det,8,L2T,10,42,0.391,0.191,0.007,20.291,0.559,experiments/det/det_voc_x8_l2t_e10_s42/test_log.txt,P3 run9 x8 lower bound
 det_voc_x8_swt_e10_s42,2026-07-04,c96b55b,det,8,S+T,10,42,0.425,0.215,0.005,21.042,0.500,experiments/det/det_voc_x8_swt_e10_s42/test_log.txt,P3 run10 x8 naive joint S+T
+det_voc_x8_sr4ir_e10_s42,2026-07-05,8fe2c0e,det,8,SR4IR,10,42,0.478,0.258,0.011,20.901,0.423,experiments/det/det_voc_x8_sr4ir_e10_s42/test_log.txt,P3 run11 x8 full SR4IR (rerun from scratch after 07-04 interrupt)
